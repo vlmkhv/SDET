@@ -1,0 +1,6 @@
+ublock/
+__pycache__/
+*.pyc
+.vscode
+.pytest_cache
+.hypothesis

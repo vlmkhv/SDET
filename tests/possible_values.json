@@ -1,0 +1,48 @@
+{
+    "genders": [
+        "Male",
+        "Female",
+        "Other"
+    ],
+    "hobbies": [
+        "Sports",
+        "Reading",
+        "Music"
+    ],
+    "subjects": [
+        "Accounting",
+        "Arts",
+        "Biology",
+        "Chemistry",
+        "Civics",
+        "Commerce",
+        "Computer Science",
+        "Economics",
+        "English",
+        "Hindi",
+        "History",
+        "Maths",
+        "Physics",
+        "Social Studies"
+    ],
+    "state_city_map": {
+        "Haryana": [
+            "Karnal",
+            "Panipat"
+        ],
+        "NCR": [
+            "Delhi",
+            "Gurgaon",
+            "Noida"
+        ],
+        "Rajasthan": [
+            "Jaipur",
+            "Jaiselmer"
+        ],
+        "Uttar Pradesh": [
+            "Agra",
+            "Lucknow",
+            "Merrut"
+        ]
+    }
+}
