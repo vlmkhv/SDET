@@ -194,17 +194,19 @@ class RegistrationFormPage:
     def submit(self):
         self.submit_button.click()
 
-    def verify_submission(self, timeout: float = 1) -> bool:
+    def verify_submission(self, timeout: float = 1.5) -> bool:
         modal_title_xpath = "//div[@class='modal-title h4' and contains(text(), 'Thanks for submitting the form')]"
         try:
             WebDriverWait(self.driver, timeout).until(
                 EC.visibility_of_element_located((By.XPATH, modal_title_xpath))
             )
-            self.driver.find_element(By.CSS_SELECTOR, "#closeLargeModal").click()
         except (TimeoutException, NoSuchElementException):
             return False
 
         return True
+
+    def close_modal(self):
+        self.driver.find_element(By.CSS_SELECTOR, "#closeLargeModal").click()
 
     def get_modal_text(self, label: str) -> str:
         xpath = f"//td[text()='{label}']/following-sibling::td"

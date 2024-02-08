@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -308,7 +309,11 @@ def fill_form(page: RegistrationFormPage, data: dict[str, Any]):
 @given(
     first_name=STRATEGIES["first_name"].valid,
     last_name=STRATEGIES["last_name"].valid,
-    email=STRATEGIES["email"].valid,
+    # Current form validation regexp
+    email=st.from_regex(
+        re.compile(r"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"),
+        fullmatch=True,
+    ),
     gender_and_picture=STRATEGIES["gender_and_picture"].valid,
     mobile=STRATEGIES["mobile"].valid,
     date_of_birth=STRATEGIES["date_of_birth"].valid,
@@ -356,10 +361,13 @@ def test_submit_registration_form_with_valid_data(
     is_submitted = page.verify_submission()
 
     try:
-        assert is_submitted, "Form submission failed or confirmation message not found."
+        assert is_submitted, f"Form submission failed with valid {data=}."
 
         if is_submitted:
-            assert_form_data_matches_expected(page, data)
+            try:
+                assert_form_data_matches_expected(page, data)
+            finally:
+                page.close_modal()
     finally:
         page.reset()
 
@@ -379,17 +387,17 @@ def assert_form_data_matches_expected(
         ),
         "Subjects": lambda expected: ", ".join(expected["subjects"]),
         "Hobbies": lambda expected: ", ".join(expected["hobbies"]),
-        "Picture": lambda expected: expected["picture"],
+        "Picture": lambda expected: Path(expected["picture"]).name,
         "Address": lambda expected: expected["address"],
         "State and City": lambda expected: f"{expected['state']} {expected['city']}",
     }
 
-    for field, extractor in POPUP_MAP.items():
+    for label, extractor in POPUP_MAP.items():
         expected_value = extractor(expected)
-        actual_value = page.get_modal_text(field)
+        actual_value = page.get_modal_text(label)
         assert (
             expected_value == actual_value
-        ), f"Error: {expected_value=} {actual_value=}"
+        ), f"Error {label=}: {expected_value=} {actual_value=}"
 
 
 # ----------------------------------------------------- VALIDATION TESTS ------------------------------------------------------
@@ -423,24 +431,30 @@ def get_test_data(**override_kwargs: dict[str, Any]) -> dict[str, Any]:
     return valid_data
 
 
-def field_validation(registration_page: RegistrationFormPage, invalid_values):
-    invalid_data = get_test_data(**invalid_values)
-    fill_form(registration_page, invalid_data)
-    registration_page.submit()
-    is_submitted = registration_page.verify_submission()
+def field_validation(
+    page: RegistrationFormPage, override_values, expect_succes: bool = False
+):
+    data = get_test_data(**override_values)
+    fill_form(page, data)
+    page.submit()
+    is_submitted = page.verify_submission()
     if is_submitted:
-        registration_page.unfill_elements()
-        registration_page.load_elements(False)
+        page.close_modal()
+        page.unfill_elements()
+        page.load_elements(accept_consent=False)
     else:
-        for field in invalid_values:
+        for field in override_values:
             try:
-                registration_page.clear_field(field)
+                page.clear_field(field)
             except AttributeError:
                 # Some fields cannot be cleared, reset the page instead
-                registration_page.reset()
+                page.reset()
                 break
 
-    assert not is_submitted, f"Form submission succeeded with {invalid_values=}"
+    if expect_succes:
+        assert is_submitted, f"Form submission failed with {override_values=}"
+    else:
+        assert not is_submitted, f"Form submission succeeded with {override_values=}"
 
 
 # Each specific test function handles the test logic for a particular field,
@@ -449,51 +463,56 @@ def field_validation(registration_page: RegistrationFormPage, invalid_values):
 
 
 @given(first_name=STRATEGIES["first_name"].invalid)
-def test_first_name_validation(registration_page, first_name):
+def test_first_name_rejection(registration_page, first_name):
     field_validation(registration_page, {"first_name": first_name})
 
 
 @given(last_name=STRATEGIES["last_name"].invalid)
-def test_last_name_validation(registration_page, last_name):
+def test_last_name_rejection(registration_page, last_name):
     field_validation(registration_page, {"last_name": last_name})
 
 
 @given(email=STRATEGIES["email"].invalid)
-def test_email_validation(registration_page, email):
+def test_email_rejection(registration_page, email):
     field_validation(registration_page, {"email": email})
 
 
+@given(email=STRATEGIES["email"].valid)
+def test_email_acceptance(registration_page, email):
+    field_validation(registration_page, {"email": email}, expect_succes=True)
+
+
 @given(gender=STRATEGIES["gender"].invalid)
-def test_gender_validation(registration_page, gender):
+def test_gender_rejection(registration_page, gender):
     field_validation(registration_page, {"gender": gender})
 
 
 @given(picture=STRATEGIES["picture"].invalid)
-def test_picture_validation(registration_page, picture):
+def test_picture_rejection(registration_page, picture):
     field_validation(registration_page, {"picture": picture})
 
 
 @given(mobile=STRATEGIES["mobile"].invalid)
-def test_mobile_validation(registration_page, mobile):
+def test_mobile_rejection(registration_page, mobile):
     field_validation(registration_page, {"mobile": mobile})
 
 
 @given(date_of_birth=STRATEGIES["date_of_birth"].invalid)
-def test_date_of_birth_validation(registration_page, date_of_birth):
+def test_date_of_birth_rejection(registration_page, date_of_birth):
     field_validation(registration_page, {"date_of_birth": date_of_birth})
 
 
 @given(subjects=STRATEGIES["subjects"].invalid)
-def test_subjects_validation(registration_page, subjects):
+def test_subjects_rejection(registration_page, subjects):
     field_validation(registration_page, {"subjects": subjects})
 
 
 @given(address=STRATEGIES["address"].invalid)
-def test_address_validation(registration_page, address):
+def test_address_rejection(registration_page, address):
     field_validation(registration_page, {"address": address})
 
 
 @given(state_and_city=STRATEGIES["state_and_city"].invalid)
-def test_state_and_city_validation(registration_page, state_and_city):
+def test_state_and_city_rejection(registration_page, state_and_city):
     state, city = state_and_city
     field_validation(registration_page, {"state": state, "city": city})
