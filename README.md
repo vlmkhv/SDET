@@ -10,6 +10,11 @@ This project automates form testing on a [demo website](https://demoqa.com/autom
 - **Comprehensive Validation**: Includes tests for all form fields, including name, email, gender selection, date of birth, subjects, hobbies, address, state, and city.
 - **Modular Structure**: Organized code structure with separate modules for page objects, test data generation, and utility functions.
 
+## Requirements
+
+- Python $\ge$ 3.10
+- [Allure Report](https://allurereport.org/docs/gettingstarted-installation/)
+
 ## Setup
 
 1. **Clone repository** 
@@ -20,7 +25,12 @@ This project automates form testing on a [demo website](https://demoqa.com/autom
 Execute the tests using pytest:
 
 ```sh
-pytest test_registration.py
+python -m pytest
+```
+
+Create a report using Allure report:
+```sh
+allure serve allure-results
 ```
 
 ## Customization

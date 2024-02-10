@@ -1,2 +1,5 @@
+[project]
+requires-python = ">= 3.10"
+
 [tool.pytest.ini_options]
-addopts = "tests -s --hypothesis-show-statistics"
+addopts = "tests -s --hypothesis-show-statistics --clean-alluredir --alluredir allure-results"

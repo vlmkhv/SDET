@@ -41,7 +41,7 @@ def get_driver(time_to_wait: float = 1.0) -> WebDriver:
 
 
 @pytest.fixture(scope="session")
-def driver(time_to_wait: float = 1) -> WebDriver:
+def driver(time_to_wait: float = 1):
     drv = get_driver(time_to_wait)
     yield drv
     drv.quit()
@@ -100,23 +100,23 @@ def hypothesis_strategies(
     # Names and addresses with at least one alphabetical character are valid
     # My choice on allowing names to contain digits is based on:
     # https://github.com/kdeldycke/awesome-falsehood
-    valid_name_or_address: SearchStrategy[str] = st.text(
-        alphabet=st.characters(
-            min_codepoint=min_supported,
-            max_codepoint=max_supported,
-            categories=(
-                "Ll",
-                "Lu",
-                "Nd",
-                "Pd",
-                "Zs",
-            ),  # Lowercase, Uppercase, Digits, Dash punctuation, Space separator
-            include_characters="'",
-        ),
-        min_size=1,
-        max_size=300,
-    ).filter(
-        lambda s: any(c.isalpha() for c in s)
+    valid_name_or_address: SearchStrategy[str] = (
+        st.text(
+            alphabet=st.characters(
+                min_codepoint=min_supported,
+                max_codepoint=max_supported,
+                categories=(
+                    "Ll",  # Lowercase letters
+                    "Lu",  # Uppercase letters
+                    "Nd",  # Digits
+                ),
+                include_characters="-' ",
+            ),
+            min_size=1,
+            max_size=300,
+        )
+        .filter(lambda s: any(c.isalpha() for c in s))
+        .map(str.strip)
     )  # Assume a valid name/address has at least 1 letter
 
     invalid_name_or_address: SearchStrategy[str | None] = st.one_of(
@@ -126,10 +126,11 @@ def hypothesis_strategies(
             alphabet=st.characters(
                 min_codepoint=min_supported,
                 max_codepoint=max_supported,
-                categories=("S", "P", "Zs", "N"),
+                categories=("S", "P", "N"),
+                include_characters="-' ",
             ),
             min_size=1,
-        ),
+        ).map(str.strip),
         # Extremely long string
         st.text(
             min_size=300,
@@ -138,10 +139,13 @@ def hypothesis_strategies(
                 max_codepoint=max_supported,
                 exclude_categories=("C",),
             ),
-        ),
+        ).map(str.strip),
     )
 
     valid_email = st.emails()
+
+    valid_email_alphabet = latin_alpha + digits + "-_."
+
     invalid_email: SearchStrategy[str | None] = st.one_of(
         st.none(),
         # Missing '@' symbol
@@ -151,7 +155,9 @@ def hypothesis_strategies(
                 max_codepoint=max_supported,
                 exclude_characters="@",
                 exclude_categories=("C",),
-            ).map(lambda x: x + ".com")
+            )
+            .map(lambda x: x + ".com")
+            .map(str.strip)
         ),
         # Starting with special characters with no escape
         st.text(alphabet="!#$%^&*()", min_size=1, max_size=10).map(
@@ -165,28 +171,21 @@ def hypothesis_strategies(
                 max_codepoint=max_supported,
                 exclude_categories=("C",),
             ),
-        ).map(lambda x: x + "@"),
+        )
+        .map(lambda x: x + "@")
+        .map(str.strip),
         # Valid structure but with repeated nonsensical domain parts
-        st.text(alphabet=latin_alpha + digits + "-_.", min_size=1, max_size=10).map(
+        st.text(alphabet=valid_email_alphabet, min_size=1, max_size=10).map(
             lambda local: f"{local}@----....com"
         ),
         # RFC 3696, Errata ID 1690
         st.text(
             min_size=255,
             max_size=300,
-            alphabet=st.characters(
-                min_codepoint=min_supported,
-                max_codepoint=max_supported,
-                exclude_categories=("C",),
-            ),
+            alphabet=valid_email_alphabet,
         ).map(lambda x: x + "@example.com"),
-        st.text(
-            alphabet=st.characters(
-                min_codepoint=min_supported,
-                max_codepoint=max_supported,
-                exclude_categories=("C",),
-            )
-        ).map(lambda x: x + "@!#$.com"),
+        # Valid structure but with invalid domain parts
+        st.text(alphabet=valid_email_alphabet).map(lambda x: x + "@!#$.com"),
     )
 
     @st.composite
@@ -246,7 +245,7 @@ def hypothesis_strategies(
             alphabet=st.characters(
                 min_codepoint=min_supported,
                 max_codepoint=max_supported,
-                exclude_categories=("Nd", "Cs"),
+                exclude_categories=("Nd", "C"),
             ),
             min_size=1,
             max_size=10,
@@ -254,7 +253,7 @@ def hypothesis_strategies(
         st.none(),
     )
 
-    valid_hobbies = st.sets(st.sampled_from(possible_values["hobbies"]))
+    valid_hobbies = st.lists(st.sampled_from(possible_values["hobbies"]), unique=True)
 
     valid_subjects = st.lists(
         st.sampled_from(possible_values["subjects"]), unique=True, min_size=1
@@ -434,6 +433,10 @@ def get_test_data(**override_kwargs: dict[str, Any]) -> dict[str, Any]:
 def field_validation(
     page: RegistrationFormPage, override_values, expect_succes: bool = False
 ):
+    # In case we have the previous test function state
+    if any(page.fields_filled.values()):
+        page.reset(False)
+
     data = get_test_data(**override_values)
     fill_form(page, data)
     page.submit()
@@ -441,14 +444,14 @@ def field_validation(
     if is_submitted:
         page.close_modal()
         page.unfill_elements()
-        page.load_elements(accept_consent=False)
+        page.load_elements(False)
     else:
         for field in override_values:
             try:
                 page.clear_field(field)
             except AttributeError:
                 # Some fields cannot be cleared, reset the page instead
-                page.reset()
+                page.reset(False)
                 break
 
     if expect_succes:

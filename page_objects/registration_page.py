@@ -33,13 +33,13 @@ class RegistrationFormPage:
         for field in self.fields_filled:
             self.fields_filled[field] = False
 
-    def reset(self):
+    def reset(self, accept_consent=True):
         self.driver.refresh()
         self.unfill_elements()
         # self.driver.delete_all_cookies()
         # self.driver.execute_script("window.localStorage.clear();")
         # self.driver.execute_script("window.sessionStorage.clear();")
-        self.load_elements()
+        self.load_elements(accept_consent)
 
     def load_elements(self, accept_consent=True):
         if accept_consent:
