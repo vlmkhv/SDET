@@ -116,6 +116,7 @@ def hypothesis_strategies(
             max_size=300,
         )
         .filter(lambda s: any(c.isalpha() for c in s))
+        .map(lambda s: re.sub(r" +", " ", s))
         .map(str.strip)
     )  # Assume a valid name/address has at least 1 letter
 
@@ -139,7 +140,9 @@ def hypothesis_strategies(
                 max_codepoint=max_supported,
                 exclude_categories=("C",),
             ),
-        ).map(str.strip),
+        )
+        .map(lambda s: re.sub(r" +", " ", s))
+        .map(str.strip),
     )
 
     valid_email = st.emails()
@@ -156,9 +159,9 @@ def hypothesis_strategies(
                 exclude_characters="@",
                 exclude_categories=("C",),
             )
-            .map(lambda x: x + ".com")
-            .map(str.strip)
-        ),
+        )
+        .map(lambda x: x + ".com")
+        .map(str.strip),
         # Starting with special characters with no escape
         st.text(alphabet="!#$%^&*()", min_size=1, max_size=10).map(
             lambda x: x + "@example.com"
